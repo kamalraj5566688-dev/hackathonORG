@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus AI | Aerospace Command System</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "canvas-night": "#000000",
+                        "canvas-night-soft": "#0a0a0a",
+                        "on-primary": "#ffffff",
+                        "on-primary-mute": "#f0f0fa",
+                        "hairline-dark": "#3a3a3f"
+                    },
+                    fontFamily: {
+                        "d-din": ['"D-DIN-Bold"', '"Arial Narrow"', 'Arial', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #000000; color: #ffffff; font-family: "D-DIN-Bold", "Arial Narrow", Arial, sans-serif; }
+        
+        .display-xxl { 
+            font-family: "D-DIN-Bold", "Arial Narrow", Arial, sans-serif;
+            font-size: 80px; 
+            font-weight: 700; 
+            line-height: 0.95; 
+            letter-spacing: 1.6px; 
+            text-transform: uppercase; 
+        }
+        .micro-cap { 
+            font-family: "D-DIN", Arial, sans-serif;
+            font-size: 12px; 
+            font-weight: 400; 
+            line-height: 2.0; 
+            letter-spacing: 0.96px; 
+            text-transform: uppercase; 
+        }
+        .button-cap { 
+            font-family: "D-DIN", Arial, sans-serif;
+            font-size: 13.008px; 
+            font-weight: 700; 
+            line-height: 0.94;
+            letter-spacing: 1.17px; 
+            text-transform: uppercase; 
+        }
+        
+        .spacex-card {
+            background-color: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid #3a3a3f;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .ghost-pill-btn {
+            background-color: #000000;
+            color: #ffffff;
+            border: 1px solid #ffffff;
+            border-radius: 32px;
+            padding: 18px 24px;
+            font-family: "D-DIN", Arial, sans-serif;
+            font-size: 13.008px;
+            font-weight: 700;
+            line-height: 0.94;
+            letter-spacing: 1.17px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+        .ghost-pill-btn:hover {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .spacex-input {
+            background-color: #ffffff;
+            border: 1px solid #3a3a3f;
+            color: #000000;
+            border-radius: 4px;
+            padding: 12px 16px;
+            font-weight: 600;
+        }
+        .spacex-input::placeholder {
+            color: #5a5a5f;
+        }
+        .spacex-input:focus {
+            border-color: #000000;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+        }
+
+        .three-container { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+        #auth-three-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: #3a3a3f; border-radius: 2px; }
+
+        @keyframes radarSweep {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(1000%); }
+        }
+        .animate-radar { animation: radarSweep 6s linear infinite; }
+        .scan-line { animation: scanline 4s ease-in-out infinite; }
+        .telemetry-glow { box-shadow: 0 0 20px rgba(255, 255, 255, 0.05); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col select-none overflow-x-hidden">
+
+<!-- Top Fixed Overlay Navigation -->
+<nav id="navbar" class="fixed top-0 w-full z-50 bg-transparent px-8 py-6 hidden justify-between items-center border-b border-[#3a3a3f]/40 backdrop-blur-sm">
+    <div class="flex items-center gap-12">
+        <span class="font-bold text-xl tracking-[2px] uppercase">INTER // AI</span>
+        <div class="flex gap-8 micro-cap">
+            <button onclick="switchTab('dashboard')" id="nav-dash" class="text-white border-b border-white pb-0.5">SOC Command</button>
+            <button onclick="switchTab('portal')" id="nav-portal" class="text-neutral-400 hover:text-white transition-colors">Mission Portal</button>
+            <button onclick="switchTab('reports')" id="nav-reports" class="text-neutral-400 hover:text-white transition-colors">Flight Telemetry</button>
+            <button onclick="switchTab('admin')" id="nav-admin" class="hidden text-red-400 font-bold">Admin Deck</button>
+        </div>
+    </div>
+    <div class="flex items-center gap-4">
+        <div id="ghost-badge" class="hidden text-[10px] tracking-wider uppercase px-3 py-1 rounded-full border border-emerald-500 text-emerald-400 font-bold animate-pulse">
+            ● Ghost Protocol Active
+        </div>
+        <button onclick="handleLogout()" class="text-neutral-400 hover:text-white micro-cap tracking-widest" title="Abort Session">
+            [ ABORT ]
+        </button>
+    </div>
+</nav>
+
+<!-- 1. AUTHENTICATION / LOGIN VIEW -->
+<section id="view-auth" class="min-h-screen flex items-center justify-center p-4 relative bg-black hidden">
+    <div id="auth-three-bg"></div>
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#3a3a3f_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
+    <main class="w-full max-w-[420px] relative z-10">
+        <div class="spacex-card p-10 flex flex-col items-center w-full shadow-2xl">
+            <div class="mb-8 text-center">
+                <span class="micro-cap text-neutral-400 block mb-2">System Authentication</span>
+                <h1 class="text-3xl font-bold tracking-wider uppercase text-white">INTER AI</h1>
+            </div>
+
+            <div class="flex w-full mb-8 border-b border-[#3a3a3f]">
+                <button id="tab-login" class="flex-1 pb-3 text-xs tracking-widest uppercase font-bold text-white border-b-2 border-white transition-colors" onclick="setAuthMode('login')">Operator</button>
+                <button id="tab-register" class="flex-1 pb-3 text-xs tracking-widest uppercase font-medium text-neutral-400 hover:text-white transition-colors" onclick="setAuthMode('register')">Register</button>
+                <button id="tab-admin" class="flex-1 pb-3 text-xs tracking-widest uppercase font-medium text-red-400 hover:text-red-300 transition-colors" onclick="setAuthMode('admin')">Admin</button>
+            </div>
+
+            <div id="auth-error" class="w-full mb-4 p-3 rounded bg-red-950/40 border border-red-800 text-red-400 text-xs hidden font-mono"></div>
+
+            <form id="auth-form" class="w-full space-y-5">
+                <div class="space-y-2">
+                    <label class="micro-cap text-neutral-300 font-bold" id="label-email">Identifier</label>
+                    <input class="spacex-input w-full text-sm" id="auth-email" type="email" placeholder="operator@nexus.space" required/>
+                </div>
+                <div class="space-y-2">
+                    <label class="micro-cap text-neutral-300 font-bold">Security Key</label>
+                    <input class="spacex-input w-full text-sm" id="auth-password" type="password" placeholder="••••••••" required/>
+                </div>
+                <button type="submit" id="auth-btn" class="ghost-pill-btn w-full mt-4 !py-4 button-cap">Authenticate Node</button>
+            </form>
+        </div>
+    </main>
+</section>
+
+<!-- 2. TAB A: SOC DASHBOARD VIEW -->
+<section id="tab-dashboard" class="hidden min-h-screen pt-32 pb-16 px-12 max-w-[1400px] mx-auto w-full flex flex-col gap-10 relative z-10">
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#3a3a3f] pb-6">
+        <div>
+            <span class="micro-cap text-neutral-400 block mb-1">Mission Control // Sector 01</span>
+            <h1 class="display-xxl text-white text-5xl md:text-7xl">SOC Command</h1>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-4">
+            <!-- Voice Synthesizer Toggle -->
+            <div class="spacex-card px-6 py-3 flex items-center gap-3">
+                <span class="micro-cap text-neutral-400">AI Voice</span>
+                <button id="voice-toggle-btn" onclick="toggleVoiceOutput()" class="text-xs font-mono px-3 py-1 rounded-full border border-emerald-500 text-emerald-400 font-bold">
+                    AUDIO: ON 🔊
+                </button>
+            </div>
+            <!-- Ghost Mode Toggle -->
+            <div class="spacex-card px-6 py-3 flex items-center gap-4">
+                <span class="micro-cap text-neutral-400">Zero-Log Ghost Mode</span>
+                <button id="ghost-toggle" onclick="toggleGhostMode()" class="w-12 h-6 rounded-full bg-neutral-800 relative transition-colors duration-300 border border-[#3a3a3f]">
+                    <div id="ghost-thumb" class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300"></div>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="spacex-card p-6 flex flex-col justify-between">
+            <span class="micro-cap text-neutral-500">System Threat Level</span>
+            <div class="text-2xl font-bold tracking-wider text-white mt-4">NOMINAL (0.00)</div>
+        </div>
+        <div class="spacex-card p-6 flex flex-col justify-between">
+            <span class="micro-cap text-neutral-500">Active Telemetry Nodes</span>
+            <div class="text-2xl font-bold tracking-wider text-white mt-4">12 / 12 ONLINE</div>
+        </div>
+        <div class="spacex-card p-6 flex flex-col justify-between">
+            <span class="micro-cap text-neutral-500">Packet Ingestion Block</span>
+            <div class="text-2xl font-bold tracking-wider text-white mt-4">1,842 PKT/S</div>
+        </div>
+        <div class="spacex-card p-6 flex flex-col justify-between">
+            <span class="micro-cap text-neutral-500">Encryption Standard</span>
+            <div class="text-2xl font-bold tracking-wider text-white mt-4">AES-256-GCM</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div class="spacex-card p-8 md:col-span-5 relative overflow-hidden flex flex-col justify-between min-h-[340px]">
+            <div id="three-hero-container" class="three-container"></div>
+            <div class="z-10">
+                <span class="micro-cap text-neutral-400">Core Telemetry</span>
+                <h2 class="text-2xl font-bold tracking-wide uppercase mt-1">Structural Integrity</h2>
+                <div class="text-6xl font-bold tracking-tighter text-white mt-6">99.9%</div>
+            </div>
+            <div class="z-10 pt-4 border-t border-[#3a3a3f] flex justify-between micro-cap text-neutral-400">
+                <span>Subsystem Status</span>
+                <span class="text-white font-bold">Synchronized</span>
+            </div>
+        </div>
+
+        <div class="spacex-card p-8 md:col-span-7 flex flex-col justify-between telemetry-glow relative overflow-hidden">
+            <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-10">
+                <div class="w-full h-20 bg-gradient-to-b from-transparent via-white to-transparent scan-line"></div>
+            </div>
+
+            <div class="flex justify-between items-center mb-6 relative z-10">
+                <h2 class="micro-cap text-white tracking-widest">Live Orbital Telemetry & Radar Grid</h2>
+                <span class="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> SECURE FEED
+                </span>
+            </div>
+
+            <div class="relative h-44 w-full flex items-center justify-center my-2 border border-[#3a3a3f]/60 rounded-xl bg-black/40 overflow-hidden">
+                <div class="absolute w-36 h-36 rounded-full border border-neutral-800"></div>
+                <div class="absolute w-24 h-24 rounded-full border border-neutral-800"></div>
+                <div class="absolute w-12 h-12 rounded-full border border-neutral-700"></div>
+                <div class="absolute inset-x-0 h-[1px] bg-neutral-800"></div>
+                <div class="absolute inset-y-0 w-[1px] bg-neutral-800"></div>
+                <div class="absolute w-36 h-36 rounded-full animate-radar pointer-events-none" style="background: conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0.15) 0deg, transparent 60deg, transparent 360deg);"></div>
+                <div class="absolute top-12 right-16 w-2 h-2 rounded-full bg-white animate-ping"></div>
+                <span class="absolute bottom-2 left-3 text-[10px] font-mono text-neutral-500 tracking-widest">AZ: 142.8 // EL: 68.4</span>
+            </div>
+
+            <div class="space-y-2.5 font-mono text-xs relative z-10 pt-2">
+                <div class="p-2.5 bg-black/80 border border-[#3a3a3f] rounded flex justify-between items-center">
+                    <span class="text-neutral-300">[NODE-ALPHA] Handshake Verified via JWT Protocol</span>
+                    <span class="text-neutral-500">T-00:14:22</span>
+                </div>
+                <div class="p-2.5 bg-red-950/20 border border-red-900/50 rounded flex justify-between items-center">
+                    <span class="text-red-400">[INTRUSION BLOCKED] Adversarial Injection Dropped</span>
+                    <span class="text-red-500 font-bold">REJECTED</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 3. TAB B: MISSION PORTAL VIEW -->
+<section id="tab-portal" class="hidden min-h-screen pt-32 pb-16 px-12 max-w-[1400px] mx-auto w-full flex flex-col gap-8 relative z-10">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 flex-grow">
+        
+        <aside class="md:col-span-4 spacex-card p-8 flex flex-col gap-6 text-center relative overflow-hidden">
+            <div id="portal-three-container" class="three-container"></div>
+            <div class="relative w-28 h-28 mx-auto my-2 z-10">
+                <img class="w-full h-full rounded-lg object-cover border border-[#3a3a3f]" src="frontend/Commander.jpg" alt="Commander"/>
+            </div>
+            <div class="z-10">
+                <h2 class="text-xl font-bold uppercase tracking-wider">Commander Nicco Robin</h2>
+                <span class="micro-cap text-neutral-400">PONEGLYPH ARCHITECTURE</span>
+            </div>
+            
+            <div class="w-full space-y-3 text-left bg-black/60 p-4 rounded border border-[#3a3a3f] text-xs font-mono z-10">
+                <div class="flex justify-between border-b border-[#3a3a3f] pb-2"><span class="text-neutral-500">Trajectory Match</span><span class="text-white font-bold">94.2%</span></div>
+                <div class="flex justify-between border-b border-[#3a3a3f] pb-2"><span class="text-neutral-500">Thermal Risk</span><span class="text-emerald-400 font-bold">Low (0.12)</span></div>
+                <div class="flex justify-between"><span class="text-neutral-500">Clearance</span><span class="text-white font-bold">Level 4</span></div>
+            </div>
+
+            <div class="w-full text-left mt-auto space-y-3 z-10">
+                <label class="micro-cap text-neutral-400 block">Select Mission Profile</label>
+                <select id="portal-domain" class="spacex-input w-full text-sm">
+                    <option>IT / Software Engineering</option>
+                    <option>Human Resources (HR)</option>
+                    <option>Management</option>
+                    <option>Marketing</option>
+                    <option>Data Science</option>
+                </select>
+                <button id="portal-start-btn" onclick="initInterview()" class="ghost-pill-btn w-full !py-3.5 mt-2 button-cap">Initialize Mission Sequence</button>
+            </div>
+        </aside>
+
+        <div class="md:col-span-8 spacex-card flex flex-col overflow-hidden h-[620px]">
+            <div class="px-6 py-4 border-b border-[#3a3a3f] bg-black flex justify-between items-center text-xs font-mono text-neutral-400">
+                <span>AI LangGraph Subroutine // Active</span>
+                <span id="portal-session-id" class="text-white">AWAITING IGNITION...</span>
+            </div>
+            <div id="chat-stream" class="flex-1 p-6 overflow-y-auto space-y-4 font-mono text-sm">
+                <div class="flex gap-4">
+                    <div class="w-7 h-7 rounded bg-neutral-800 border border-[#3a3a3f] flex items-center justify-center text-xs font-bold text-white">AI</div>
+                    <div class="spacex-card p-4 rounded-xl text-neutral-300 max-w-[80%]">Configure parameters on the navigation console and launch sequence to begin evaluation.</div>
+                </div>
+            </div>
+            <form id="chat-form" onsubmit="sendChatMessage(event)" class="p-4 border-t border-[#3a3a3f] bg-black flex gap-3">
+                <input id="chat-input" type="text" class="spacex-input flex-1 text-sm font-mono text-white bg-black" placeholder="Input telemetry response..." disabled required/>
+                <button type="submit" id="chat-send" class="ghost-pill-btn !py-2.5 !px-5 disabled:opacity-30 button-cap">SEND</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<!-- 4. TAB C: REDESIGNED INTERVIEW REPORT VIEW WITH MULTI-DOWNLOAD OPTIONS -->
+<section id="tab-reports" class="hidden min-h-screen pt-32 pb-16 px-12 max-w-[1400px] mx-auto w-full flex flex-col gap-8 relative z-10">
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#3a3a3f] pb-6">
+        <div>
+            <span class="micro-cap text-neutral-400 block mb-1">INTERVIEW REPORT // BY INTER.AI</span>
+            <h1 class="display-xxl text-white text-5xl md:text-7xl">INTERVIEW REPORT</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <button onclick="downloadReportPDF()" class="ghost-pill-btn !py-3 button-cap">Export PDF</button>
+            <button onclick="downloadReportWord()" class="ghost-pill-btn !py-3 button-cap">Export Word</button>
+            <button onclick="downloadReportJSON()" class="ghost-pill-btn !py-3 button-cap">Export JSON</button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div class="spacex-card p-8 md:col-span-8 flex flex-col justify-between relative overflow-hidden">
+            <div id="reports-three-container" class="three-container"></div>
+            <div class="relative z-10">
+                <h2 class="text-xl font-bold tracking-wider uppercase mb-4">Executive Flight Summary</h2>
+                <p class="text-neutral-300 text-sm leading-relaxed mb-8 font-mono">
+                    Model Aura-7 telemetry demonstrates exceptional stability within defined orbital limits. Neural synthesis latency reduced by 14.3% over baseline. Zero adversarial penetration vectors recorded across node boundaries.
+                </p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="spacex-card p-4 rounded border border-[#3a3a3f] bg-black/60"><div class="micro-cap text-neutral-500 mb-1">Score</div><div class="text-3xl font-bold text-white">94.2%</div></div>
+                    <div class="spacex-card p-4 rounded border border-[#3a3a3f] bg-black/60"><div class="micro-cap text-neutral-500 mb-1">Latency</div><div class="text-3xl font-bold text-white">12ms</div></div>
+                    <div class="spacex-card p-4 rounded border border-[#3a3a3f] bg-black/60"><div class="micro-cap text-neutral-500 mb-1">Coherence</div><div class="text-3xl font-bold text-white">A+</div></div>
+                    <div class="spacex-card p-4 rounded border border-[#3a3a3f] bg-black/60"><div class="micro-cap text-neutral-500 mb-1">Anomalies</div><div class="text-3xl font-bold text-white">0</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="spacex-card p-6 md:col-span-4 flex flex-col items-center justify-center relative overflow-hidden">
+            <h2 class="micro-cap text-neutral-400 mb-4 self-start tracking-wider z-10">Subsystem Matrix</h2>
+            <div class="relative h-56 w-full flex justify-center z-10">
+                <canvas id="skillRadarChart"></canvas>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 5. TAB D: ADMIN CONTROL DECK -->
+<section id="tab-admin" class="hidden min-h-screen pt-32 pb-16 px-12 max-w-[1400px] mx-auto w-full flex flex-col gap-8 relative z-10">
+    <header class="flex justify-between items-center spacex-card p-6">
+        <div>
+            <span class="micro-cap text-red-500 block mb-1">Master Override Deck</span>
+            <h1 class="text-3xl font-bold uppercase tracking-wider">All Candidate Flight Logs</h1>
+        </div>
+        <button onclick="loadAdminReports()" class="ghost-pill-btn !py-2.5 text-xs button-cap">Sync Logs</button>
+    </header>
+
+    <div class="spacex-card p-6 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+                <thead>
+                    <tr class="border-b border-[#3a3a3f] text-neutral-500 bg-black/40">
+                        <th class="p-4">Session UUID</th>
+                        <th class="p-4">Candidate ID</th>
+                        <th class="p-4">Mission Domain</th>
+                        <th class="p-4">Final Score</th>
+                        <th class="p-4">Coherence</th>
+                        <th class="p-4">Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-reports-table-body" class="divide-y divide-[#3a3a3f]">
+                    <tr><td colspan="6" class="p-6 text-center text-neutral-500">Querying central flight database...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- Scripts -->
+<script>
+    let currentAuthMode = 'login';
+    let currentSessionId = null;
+    let isGhostModeEnabled = localStorage.getItem('ghost_mode') === 'true';
+    let isVoiceEnabled = true;
+    let radarChartInstance = null;
+
+    function speakText(text) {
+        if (!isVoiceEnabled || !("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function toggleVoiceOutput() {
+        isVoiceEnabled = !isVoiceEnabled;
+        const btn = document.getElementById('voice-toggle-btn');
+        if (isVoiceEnabled) {
+            btn.innerText = "AUDIO: ON 🔊";
+            btn.className = "text-xs font-mono px-3 py-1 rounded-full border border-emerald-500 text-emerald-400 font-bold";
+        } else {
+            btn.innerText = "AUDIO: OFF 🔇";
+            btn.className = "text-xs font-mono px-3 py-1 rounded-full border border-neutral-700 text-neutral-500 font-bold";
+            window.speechSynthesis.cancel();
+        }
+    }
+
+    function switchTab(tabName) {
+        document.getElementById('view-auth').classList.add('hidden');
+        document.getElementById('tab-dashboard').classList.add('hidden');
+        document.getElementById('tab-portal').classList.add('hidden');
+        document.getElementById('tab-reports').classList.add('hidden');
+        document.getElementById('tab-admin').classList.add('hidden');
+        document.getElementById('navbar').classList.remove('hidden');
+
+        document.getElementById('nav-dash').className = "text-neutral-400 hover:text-white transition-colors";
+        document.getElementById('nav-portal').className = "text-neutral-400 hover:text-white transition-colors";
+        document.getElementById('nav-reports').className = "text-neutral-400 hover:text-white transition-colors";
+        document.getElementById('nav-admin').className = "hidden";
+
+        const userRole = localStorage.getItem('user_role');
+        if (userRole === 'admin') {
+            document.getElementById('nav-admin').classList.remove('hidden');
+        }
+
+        if (tabName === 'auth') {
+            document.getElementById('view-auth').classList.remove('hidden');
+            document.getElementById('navbar').classList.add('hidden');
+        } else if (tabName === 'dashboard') {
+            document.getElementById('tab-dashboard').classList.remove('hidden');
+            document.getElementById('nav-dash').className = "text-white border-b border-white pb-0.5";
+        } else if (tabName === 'portal') {
+            document.getElementById('tab-portal').classList.remove('hidden');
+            document.getElementById('nav-portal').className = "text-white border-b border-white pb-0.5";
+        } else if (tabName === 'reports') {
+            document.getElementById('tab-reports').classList.remove('hidden');
+            document.getElementById('nav-reports').className = "text-white border-b border-white pb-0.5";
+            initRadarChart();
+        } else if (tabName === 'admin') {
+            document.getElementById('tab-admin').classList.remove('hidden');
+            document.getElementById('nav-admin').className = "text-red-400 font-bold border-b border-red-500 pb-0.5";
+            loadAdminReports();
+        }
+        updateGhostUI();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            const role = localStorage.getItem('user_role');
+            if (role === 'admin') switchTab('admin');
+            else switchTab('dashboard');
+        } else {
+            switchTab('auth');
+        }
+        
+        updateGhostUI();
+        
+        initThreeJsScene('auth-three-bg', 3.0, 0.001);
+        initThreeJsScene('three-hero-container', 1.5, 0.003);
+        initThreeJsScene('portal-three-container', 1.6, 0.002);
+        initThreeJsScene('reports-three-container', 2.0, 0.0015);
+    });
+
+    function setAuthMode(mode) {
+        currentAuthMode = mode;
+        const btn = document.getElementById('auth-btn');
+        const emailLabel = document.getElementById('label-email');
+        const emailInput = document.getElementById('auth-email');
+
+        document.getElementById('tab-login').className = "flex-1 pb-3 text-xs tracking-widest uppercase font-medium text-neutral-400 hover:text-white transition-colors";
+        document.getElementById('tab-register').className = "flex-1 pb-3 text-xs tracking-widest uppercase font-medium text-neutral-400 hover:text-white transition-colors";
+        document.getElementById('tab-admin').className = "flex-1 pb-3 text-xs tracking-widest uppercase font-medium text-red-400 hover:text-red-300 transition-colors";
+
+        if (mode === 'login') {
+            document.getElementById('tab-login').className = "flex-1 pb-3 text-xs tracking-widest uppercase font-bold text-white border-b-2 border-white transition-colors";
+            btn.innerText = "Authenticate Node";
+            emailLabel.innerText = "Identifier";
+            emailInput.value = "";
+        } else if (mode === 'register') {
+            document.getElementById('tab-register').className = "flex-1 pb-3 text-xs tracking-widest uppercase font-bold text-white border-b-2 border-white transition-colors";
+            btn.innerText = "Initialize Account";
+            emailLabel.innerText = "Identifier";
+            emailInput.value = "";
+        } else if (mode === 'admin') {
+            document.getElementById('tab-admin').className = "flex-1 pb-3 text-xs tracking-widest uppercase font-bold text-red-400 border-b-2 border-red-500 transition-colors";
+            btn.innerText = "Access Admin Deck";
+            emailLabel.innerText = "Admin Credential";
+            emailInput.value = "admin@nexus.ai";
+        }
+    }
+
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+        const errBox = document.getElementById('auth-error');
+        errBox.classList.add('hidden');
+
+        let endpoint = '/login';
+        if (currentAuthMode === 'register') endpoint = '/register';
+        if (currentAuthMode === 'admin') endpoint = '/admin/login';
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/api${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('access_token', data.access_token);
+                if (currentAuthMode === 'admin') {
+                    localStorage.setItem('user_role', 'admin');
+                    switchTab('admin');
+                } else {
+                    localStorage.setItem('user_role', 'candidate');
+                    switchTab('dashboard');
+                }
+            } else {
+                errBox.innerText = data.detail || 'Authentication failure.';
+                errBox.classList.remove('hidden');
+            }
+        } catch (ex) {
+            errBox.innerText = 'Unable to reach backend telemetry at http://127.0.0.1:8000';
+            errBox.classList.remove('hidden');
+        }
+    });
+
+    async function loadAdminReports() {
+        const token = localStorage.getItem('access_token');
+        const tableBody = document.getElementById('admin-reports-table-body');
+        tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-neutral-500">Querying secure records...</td></tr>`;
+
+        try {
+            const res = await fetch('http://127.0.0.1:8000/api/admin/candidates/reports', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok && data.reports.length > 0) {
+                let html = '';
+                data.reports.forEach(r => {
+                    html += `
+                        <tr class="hover:bg-neutral-900 transition-colors">
+                            <td class="p-4 text-white font-bold">${r.session_id}</td>
+                            <td class="p-4 text-neutral-300">${r.candidate_email}</td>
+                            <td class="p-4 text-neutral-300">${r.domain}</td>
+                            <td class="p-4 text-emerald-400 font-bold">${r.score}</td>
+                            <td class="p-4 text-neutral-300">${r.coherence}</td>
+                            <td class="p-4 text-neutral-500">${r.timestamp}</td>
+                        </tr>
+                    `;
+                });
+                tableBody.innerHTML = html;
+            } else {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-neutral-500">No flight records logged.</td></tr>`;
+            }
+        } catch (e) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-500">Telemetry connection fault.</td></tr>`;
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user_role');
+        switchTab('auth');
+    }
+
+    function toggleGhostMode() {
+        isGhostModeEnabled = !isGhostModeEnabled;
+        localStorage.setItem('ghost_mode', isGhostModeEnabled);
+        updateGhostUI();
+    }
+
+    function updateGhostUI() {
+        const thumb = document.getElementById('ghost-thumb');
+        const toggle = document.getElementById('ghost-toggle');
+        const badge = document.getElementById('ghost-badge');
+        if (isGhostModeEnabled) {
+            toggle.className = "w-12 h-6 rounded-full bg-emerald-600 relative transition-colors duration-300 border border-emerald-500";
+            thumb.style.transform = "translateX(24px)";
+            badge.classList.remove('hidden');
+        } else {
+            toggle.className = "w-12 h-6 rounded-full bg-neutral-800 relative transition-colors duration-300 border border-[#3a3a3f]";
+            thumb.style.transform = "translateX(0px)";
+            badge.classList.add('hidden');
+        }
+    }
+
+    async function initInterview() {
+        const token = localStorage.getItem('access_token');
+        const domain = document.getElementById('portal-domain').value;
+        currentSessionId = crypto.randomUUID();
+        document.getElementById('portal-session-id').innerText = `ID: ${currentSessionId.substring(0,8)}...`;
+
+        try {
+            const res = await fetch('http://127.0.0.1:8000/api/interview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    sessionId: currentSessionId,
+                    ghostMode: isGhostModeEnabled,
+                    candidate: { jobRole: domain }
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('chat-input').disabled = false;
+                document.getElementById('chat-send').disabled = false;
+                document.getElementById('chat-input').placeholder = "Transmit message...";
+                appendChatBubble('ai', data.reply);
+                speakText(data.reply);
+            } else {
+                alert('Launch fault: ' + (data.detail || 'Unknown'));
+            }
+        } catch (err) {
+            alert('Mission control communication offline.');
+        }
+    }
+
+    async function sendChatMessage(e) {
+        e.preventDefault();
+        const inputField = document.getElementById('chat-input');
+        const text = inputField.value.trim();
+        if (!text || !currentSessionId) return;
+
+        inputField.value = '';
+        appendChatBubble('user', text);
+
+        const token = localStorage.getItem('access_token');
+        try {
+            const res = await fetch('http://127.0.0.1:8000/api/interview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    sessionId: currentSessionId,
+                    message: text,
+                    ghostMode: isGhostModeEnabled
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                appendChatBubble('ai', data.reply);
+                speakText(data.reply);
+                if (data.done) {
+                    inputField.disabled = true;
+                    document.getElementById('chat-send').disabled = true;
+                    inputField.placeholder = "Mission Sequence Complete.";
+                    alert("Evaluation sequence completed successfully.");
+                }
+            }
+        } catch (ex) {
+            console.error('Transmission fault:', ex);
+        }
+    }
+
+    function appendChatBubble(sender, message) {
+        const isUser = sender === 'user';
+        const stream = document.getElementById('chat-stream');
+        const html = `
+            <div class="flex gap-4 ${isUser ? 'flex-row-reverse' : ''}">
+                <div class="w-7 h-7 rounded bg-neutral-800 border border-[#3a3a3f] flex items-center justify-center text-xs font-bold ${isUser ? 'text-neutral-400' : 'text-white'}">${isUser ? 'U' : 'AI'}</div>
+                <div class="spacex-card p-4 rounded-xl text-sm max-w-[80%] ${isUser ? 'text-right bg-neutral-900/60' : 'text-neutral-300'}">${message}</div>
+            </div>
+        `;
+        stream.innerHTML += html;
+        stream.scrollTop = stream.scrollHeight;
+    }
+
+    function downloadReportPDF() {
+        const element = document.getElementById('tab-reports');
+        
+        // Temporarily hide the action buttons during PDF capture
+        const actionButtons = element.querySelector('header .flex.flex-wrap');
+        if (actionButtons) actionButtons.style.display = 'none';
+
+        const options = {
+            margin:       10,
+            filename:     'INTER_AI_Interview_Report.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().from(element).set(options).save().then(() => {
+            // Restore action buttons after PDF is generated
+            if (actionButtons) actionButtons.style.display = 'flex';
+        });
+    }
+
+    function downloadReportWord() {
+        const reportHTML = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/1999/xhtml'>
+            <head><title>Interview Report</title></head>
+            <body style="font-family: Arial, sans-serif; background: #000; color: #fff; padding: 20px;">
+                <h1 style="color: #fff; text-transform: uppercase;">INTER // AI - Interview Report</h1>
+                <p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
+                <hr style="border-color: #333;"/>
+                <h2>Executive Summary</h2>
+                <p>Model Aura-7 telemetry demonstrates exceptional stability within defined orbital limits. Zero adversarial penetration vectors recorded.</p>
+                <h2>Performance Metrics</h2>
+                <ul>
+                    <li><strong>Score:</strong> 94.2%</li>
+                    <li><strong>Latency:</strong> 12ms</li>
+                    <li><strong>Coherence:</strong> A+</li>
+                    <li><strong>Anomalies:</strong> 0</li>
+                </ul>
+            </body>
+            </html>
+        `;
+        const blob = new Blob(['\ufeff' + reportHTML], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = 'INTER_AI_Interview_Report.doc'; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function downloadReportJSON() {
+        const reportData = {
+            platform: "INTER // AI",
+            reportType: "Interview Evaluation Report",
+            timestamp: new Date().toISOString(),
+            summary: "Model Aura-7 telemetry demonstrates exceptional stability within defined orbital limits. Zero adversarial penetration vectors recorded.",
+            metrics: {
+                score: "94.2%",
+                latency: "12ms",
+                coherence: "A+",
+                anomalies: 0
+            },
+            subsystemMatrix: {
+                logic: 90,
+                creativity: 85,
+                empathy: 70,
+                dataRetrieval: 95,
+                coding: 88,
+                safety: 98
+            }
+        };
+        const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = 'INTER_AI_Interview_Report.json'; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function initThreeJsScene(containerId, scale = 1.5, rotSpeed = 0.003) {
+        const container = document.getElementById(containerId);
+        if (!container || !window.THREE) return;
+
+        const width = container.clientWidth || window.innerWidth;
+        const height = container.clientHeight || window.innerHeight;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const geometry = new THREE.IcosahedronGeometry(scale, 2);
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.18
+        });
+
+        const sphere = new THREE.Mesh(geometry, material);
+        scene.add(sphere);
+        scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+        camera.position.z = 3.5;
+
+        window.addEventListener('resize', () => {
+            if (!container) return;
+            const w = container.clientWidth || window.innerWidth;
+            const h = container.clientHeight || window.innerHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        });
+
+        function animateThree() {
+            requestAnimationFrame(animateThree);
+            sphere.rotation.y += rotSpeed;
+            sphere.rotation.x += rotSpeed * 0.5;
+            renderer.render(scene, camera);
+        }
+        animateThree();
+    }
+
+    function initRadarChart() {
+        if (radarChartInstance) return;
+        const ctx = document.getElementById('skillRadarChart').getContext('2d');
+        radarChartInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Logic', 'Creativity', 'Empathy', 'Data Retrieval', 'Coding', 'Safety'],
+                datasets: [{
+                    label: 'Telemetry Aura-7',
+                    data: [90, 85, 70, 95, 88, 98],
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    borderColor: '#ffffff',
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: '#000000',
+                    borderWidth: 1.5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { 
+                    r: { 
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { display: false, min: 0, max: 100 } 
+                    } 
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+</script>
+</body>
+</html>
